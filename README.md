@@ -1,20 +1,17 @@
-## To execute the 50b ZK Worker on "Mocked" mode:
+## To execute the 50b ZK Worker on AWS:
+
+TODO
+
+## To execute the 50b ZK Worker on local development environment on "Mocked" mode:
 
 ### First time:
 
+> Python version used: 3.11.8
+
 ```
 python -m venv .venv
-```
-
-```
 source .venv/bin/activate
-```
-
-```
 cd public
-```
-
-```
 pip install -r requirements.txt
 ```
 
