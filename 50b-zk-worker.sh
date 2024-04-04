@@ -30,8 +30,8 @@ elif [ "$1" = "start" ]; then
   PORT=5000
 
   HOST_IP=$(curl -s http://checkip.amazonaws.com | sed 's/\./-/g')
-  WORKER_URL="http://ec2-$HOST_IP.compute-1.amazonaws.com:$PORT"
-  HUB_URL="https://50b-hub.herokuapp.com"
+  WORKER_URL=http://ec2-$HOST_IP.compute-1.amazonaws.com:$PORT
+  HUB_URL=https://ddfa1056febf4955a6b3950472e6c937.api.mockbin.io
 
   echo "Starting 50b ZK Worker..."
 

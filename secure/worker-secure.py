@@ -49,19 +49,29 @@ class VsockServer:
 
                     from_client.sendall(response)
 
-                if cmd['command'] == 'decrypt':
-                    print('Decrypting: {}'.format(cmd['data']), flush=True)
-                    
+                if cmd['command'] == 'compute-proof':
+                    script = cmd['script']
+                    ciphered_inputs = cmd['inputs']
+                    ciphered_aeskey = cmd['key']
+                    iv = cmd['iv']
+
+                    print('Computing proof for: {}'.format(ciphered_inputs), flush=True)
+
                     rsa_private_key = RSA.import_key(private_key)
                     cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
                     
-                    aes_key = cipher_rsa.decrypt(self.safe_b64decode(cmd['key']))
-                    aes_iv = self.safe_b64decode(cmd['iv'])
+                    aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
+                    aes_iv = self.safe_b64decode(iv)
                     
                     cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-                    data = unpad(cipher_aes.decrypt(self.safe_b64decode(cmd['data'])), AES.block_size)
+                    inputs = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_inputs)), AES.block_size)
 
-                    print(data.decode(), flush=True)
+                    response = json.dumps({
+                        'command': 'compute-proof',
+                        'proof': 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode()),
+                    }).encode()
+
+                    from_client.sendall(response)
             print()
             from_client.close()
 

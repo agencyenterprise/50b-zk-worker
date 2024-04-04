@@ -41,9 +41,7 @@ class VsockClient:
                     break
                 
                 response = json.loads(data)
-
-                if response['command'] == 'get-public-key':
-                    set_public_key(response['public_key'])
+                handle_secure_response(response)
 
             print()
 
@@ -51,7 +49,19 @@ class VsockClient:
         """Close the client socket"""
         self.sock.close()
 
-def init_socket():
+mode = os.environ.get('MODE', 'Secure')
+public_key = None
+
+def init_worker():
+    if mode == 'Secure':
+        init_secure_socket()
+    else:
+        handle_secure_response({
+            'command': 'get-public-key',
+            'public_key': os.environ['PUBLIC_KEY'],
+        })
+
+def init_secure_socket():
     global client
     client = VsockClient()
 
@@ -64,24 +74,26 @@ def init_socket():
         except Exception as e:
             time.sleep(10)
 
-mode = os.environ.get('MODE', 'Secure')
-private_key = None
-public_key = None
+def handle_secure_response(response):
+    if response['command'] == 'get-public-key':
+        set_public_key(response['public_key'])
 
-def set_private_key(key):
-    global private_key
-    private_key = key
+    if response['command'] == 'compute-proof':
+        call_hub('Proof', '/worker/proof', {
+            'proof': response['proof']
+        })
 
 def set_public_key(key):
     global public_key
     public_key = key
 
 def register_worker():
-    while not public_key:
-        cmd = json.dumps({'command': 'get-public-key'}).encode()
-        client.send_data(cmd)
-        print('Asked for public key to Worker Secure...', flush=True)
-        time.sleep(10)
+    if mode == 'Secure':
+        while not public_key:
+            cmd = json.dumps({'command': 'get-public-key'}).encode()
+            client.send_data(cmd)
+            print('Asked for public key to Worker Secure...', flush=True)
+            time.sleep(10)
     
     print('Mode: {}'.format(mode))
     print('Hub URL: {}'.format(os.environ['HUB_URL']))
@@ -89,21 +101,24 @@ def register_worker():
     print('Worker Wallet: {}'.format(os.environ['WORKER_WALLET']))
     print('Public key: {}'.format(public_key), flush=True)
 
+    call_hub('Worker registration', '/worker/register', {
+        'mode': mode,
+        'url': os.environ['WORKER_URL'],
+        'wallet': os.environ['WORKER_WALLET'],
+        'public_key': public_key
+    })
+
+def call_hub(action, endpoint, data):
     try:
-        response = httpx.post(os.environ['HUB_URL'] + '/worker/register', json={
-            'mode': mode,
-            'url': os.environ['WORKER_URL'],
-            'wallet': os.environ['WORKER_WALLET'],
-            'public_key': public_key
-        })
+        response = httpx.post(os.environ['HUB_URL'] + endpoint, json=data)
 
         if response.status_code == 200:
-            print('Worker registered on Hub successfully.', flush=True)
+            print('{} sent to the Hub successfully.'.format(action), flush=True)
         else:
-            print('Error registering worker: {}'.format(response.text), flush=True)
+            print('Error executing "{}" action: {}'.format(action, response.text), flush=True)
             exit(1)
     except Exception as e:
-        print('Error registering worker: {}'.format(e), flush=True)
+        print('Error executing "{}" action: {}'.format(action, e), flush=True)
         exit(1)
 
 def safe_b64decode(data):
@@ -111,13 +126,7 @@ def safe_b64decode(data):
 
 app = Flask(__name__)
 
-if mode == 'Secure':
-    init_socket()
-    threading.Thread(target=client.recv_data).start()
-else:
-    set_private_key(os.environ['PRIVATE_KEY'])
-    set_public_key(os.environ['PUBLIC_KEY'])
-
+init_worker()
 register_worker()
 
 @app.route('/', methods=['GET'])
@@ -134,31 +143,37 @@ def root():
 def healthcheck():
     return jsonify({ 'status': 'Ok' })
 
-@app.route('/decrypt', methods=['GET'])
-def decrypt():
-    data = request.args.get('data')
-    key = request.args.get('key')
+@app.route('/proof', methods=['GET'])
+def proof():
+    script = request.args.get('script')
+    ciphered_inputs = request.args.get('inputs')
+    ciphered_aeskey = request.args.get('key')
     iv = request.args.get('iv')
 
     if mode == 'Secure':
         cmd = json.dumps({
-            'command': 'decrypt',
-            'data': data,
-            'key': key,
+            'command': 'compute-proof',
+            'script': script,
+            'inputs': ciphered_inputs,
+            'key': ciphered_aeskey,
             'iv': iv
         }).encode()
 
         client.send_data(cmd)
-    else:                   
+    else:
+        private_key = os.environ['PRIVATE_KEY']
         rsa_private_key = RSA.import_key(safe_b64decode(private_key))
         cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
         
-        aes_key = cipher_rsa.decrypt(safe_b64decode(key))
+        aes_key = cipher_rsa.decrypt(safe_b64decode(ciphered_aeskey))
         aes_iv = safe_b64decode(iv)
         
         cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-        data = unpad(cipher_aes.decrypt(safe_b64decode(data)), AES.block_size)
+        inputs = unpad(cipher_aes.decrypt(safe_b64decode(ciphered_inputs)), AES.block_size)
 
-        print(data.decode(), flush=True)
+        handle_secure_response({
+            'command': 'compute-proof',
+            'proof': 'This proof was generated in mocked worker by script "{}" for the inputs: "{}"'.format(script, inputs.decode()),
+        })
 
     return jsonify({})
