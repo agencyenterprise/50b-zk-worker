@@ -66,9 +66,12 @@ class VsockServer:
                     cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
                     inputs = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_inputs)), AES.block_size)
 
+                    # TODO: Add the actual zk proof computation here
+                    proof = 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode())
+
                     response = json.dumps({
                         'command': 'compute-proof',
-                        'proof': 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode()),
+                        'proof': proof,
                     }).encode()
 
                     from_client.sendall(response)
