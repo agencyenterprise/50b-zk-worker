@@ -1,0 +1,9 @@
+{
+  "name": "50b-zk-worker-public",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "author": "",
+  "license": "ISC"
+}
