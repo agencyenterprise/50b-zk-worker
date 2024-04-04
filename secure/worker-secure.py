@@ -35,46 +35,51 @@ class VsockServer:
                     break
                 if not data:
                     break
-                
-                cmd = json.loads(data)
 
-                if cmd['command'] == 'get-public-key':
-                    print('Sending public key to client...', flush=True)
-                    print('Public key: {}'.format(base64.urlsafe_b64encode(public_key).decode()), flush=True)
+                try:
+                    cmd = json.loads(data)
 
-                    response = json.dumps({
-                        'command': 'get-public-key',
-                        'public_key': base64.urlsafe_b64encode(public_key).decode()
-                    }).encode()
+                    if cmd['command'] == 'get-public-key':
+                        print('Sending public key to client...', flush=True)
+                        print('Public key: {}'.format(base64.urlsafe_b64encode(public_key).decode()), flush=True)
 
-                    from_client.sendall(response)
+                        response = json.dumps({
+                            'command': 'get-public-key',
+                            'public_key': base64.urlsafe_b64encode(public_key).decode()
+                        }).encode()
 
-                if cmd['command'] == 'compute-proof':
-                    script = cmd['script']
-                    ciphered_inputs = cmd['inputs']
-                    ciphered_aeskey = cmd['key']
-                    iv = cmd['iv']
+                        from_client.sendall(response)
 
-                    print('Computing proof for: {}'.format(ciphered_inputs), flush=True)
+                    if cmd['command'] == 'compute-proof':
+                        script = cmd['script']
+                        ciphered_inputs = cmd['inputs']
+                        ciphered_aeskey = cmd['key']
+                        iv = cmd['iv']
 
-                    rsa_private_key = RSA.import_key(private_key)
-                    cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
-                    
-                    aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
-                    aes_iv = self.safe_b64decode(iv)
-                    
-                    cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-                    inputs = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_inputs)), AES.block_size)
+                        print('Computing proof for: {}'.format(ciphered_inputs), flush=True)
 
-                    # TODO: Add the actual zk proof computation here
-                    proof = 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode())
+                        rsa_private_key = RSA.import_key(private_key)
+                        cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
+                        
+                        aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
+                        aes_iv = self.safe_b64decode(iv)
+                        
+                        cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
+                        inputs = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_inputs)), AES.block_size)
 
-                    response = json.dumps({
-                        'command': 'compute-proof',
-                        'proof': proof,
-                    }).encode()
+                        # TODO: Add the actual zk proof computation here
+                        proof = 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode()).encode()
 
-                    from_client.sendall(response)
+                        response = json.dumps({
+                            'command': 'compute-proof',
+                            'proof': base64.urlsafe_b64encode(proof).decode(),
+                        }).encode()
+
+                        from_client.sendall(response)
+                except Exception as e:
+                    print('Error executing command "{}": {}'.format(data, e), flush=True)
+                    break
+
             print()
             from_client.close()
 
