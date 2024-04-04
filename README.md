@@ -2,7 +2,7 @@
 
 TODO
 
-## To execute the 50b ZK Worker on local development environment on "Mocked" mode:
+## To execute the 50b ZK Worker on local development environment using "Mocked" mode:
 
 ### First time:
 
@@ -19,22 +19,23 @@ pip install -r requirements.txt
 
 ```
 cd public
-./start-mocked-worker [port] [hub_url]
+./start-mocked-worker.sh [port] [hub_url] [worker_wallet]
 ```
 
 Where:  
- `port` is the port where the worker will run (Optional, default: 5000)  
- `hub_url` is the Hub URL this worker will interact (Optional, default: http://localhost:3000)
+`port` is the port where the worker will run (Optional, default: 5000)  
+`hub_url` is the Hub URL this worker will interact (Optional, default: http://localhost:3000)  
+`worker_wallet` is the Worker wallet addres that will receive payments (Optional, default: 0x80963163d664fD34fc2e15104904CBba213377b3)
 
-> To run multiple workers, you must run the command in different terminals using different ports:
+To run multiple workers, you must run the command in different terminals using different ports:  
+Terminal 1: `./start-mocked-worker.sh 5001`  
+Terminal 2: `./start-mocked-worker.sh 5002`  
+Terminal 3: `./start-mocked-worker.sh 5003`
 
-Terminal 1: `./start-mocked-worker 5001`  
-Terminal 2: `./start-mocked-worker 5002`  
-Terminal 3: `./start-mocked-worker 5003`
+To run the worker using some other Hub deployment and wallet:  
+`./start-mocked-worker.sh 5000 https://50b-hub.herokuapp.com 0xB05Cb6716938dc10a48AF2dC73822f3F3FF5b422`
 
-> To run the worker using some other Hub deployment:
-
-`./start-mocked-worker 5000 https://50b-hub.herokuapp.com`
+> You can change the environment variables in `start-mocked-worker.sh` script
 
 ### Check the application using these endpoints:
 
