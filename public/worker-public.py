@@ -105,7 +105,7 @@ def register_worker():
         'mode': mode,
         'url': os.environ['WORKER_URL'],
         'wallet': os.environ['WORKER_WALLET'],
-        'public_key': public_key
+        'signingPublicKey': public_key
     })
 
 def call_hub(action, endpoint, data):
