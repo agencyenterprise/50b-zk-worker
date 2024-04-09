@@ -104,11 +104,11 @@ def register_worker():
     print('Worker Wallet: {}'.format(os.environ['WORKER_WALLET']))
     print('Public key: {}'.format(public_key), flush=True)
 
-    call_hub('Worker registration', '/worker/register', {
+    call_hub('Worker registration', '/workers/register', {
         'mode': mode,
         'url': os.environ['WORKER_URL'],
         'wallet': os.environ['WORKER_WALLET'],
-        'public_key': public_key
+        'signingPublicKey': public_key
     })
 
 def call_hub(action, endpoint, data):
