@@ -8,6 +8,8 @@ import threading
 import socket
 import time
 import base64
+import subprocess
+import tempfile
 import httpx
 import Crypto.Hash.SHA256
 from Crypto.PublicKey import RSA
@@ -80,6 +82,7 @@ def handle_secure_response(response):
 
     if response['command'] == 'compute-proof':
         call_hub('Proof', '/worker/proof', {
+            'jobId': response['jobId'],
             'proof': response['proof']
         })
 
@@ -124,6 +127,32 @@ def call_hub(action, endpoint, data):
 def safe_b64decode(data):
     return base64.urlsafe_b64decode(data + '=' * (-len(data) % 4))
 
+def convert_r1cs_to_zkey(r1cs):
+    r1cs_file = tempfile.NamedTemporaryFile(delete=False)
+    r1cs_file.write(safe_b64decode(r1cs))
+    r1cs_file.close()
+   
+    p = subprocess.Popen(['/usr/local/bin/node', 'scripts/setup.js', r1cs_file.name], stdout=subprocess.PIPE)
+    zkeyFilename = p.stdout.read().decode().replace('\n', '')
+
+    zkey = base64.urlsafe_b64encode(open(zkeyFilename, 'rb').read()).decode()
+    
+    os.unlink(r1cs_file.name)
+    os.unlink(zkeyFilename)
+
+    return zkey
+
+def decrypt_witness_mocked(ciphered_witness, ciphered_aeskey, iv):
+    private_key = os.environ['PRIVATE_KEY']
+    rsa_private_key = RSA.import_key(safe_b64decode(private_key))
+    cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
+    
+    aes_key = cipher_rsa.decrypt(safe_b64decode(ciphered_aeskey))
+    aes_iv = safe_b64decode(iv)
+    
+    cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
+    return unpad(cipher_aes.decrypt(safe_b64decode(ciphered_witness)), AES.block_size)
+
 app = Flask(__name__)
 
 init_worker()
@@ -145,35 +174,35 @@ def healthcheck():
 
 @app.route('/proof', methods=['GET'])
 def proof():
-    script = request.args.get('script')
-    ciphered_inputs = request.args.get('inputs')
+    jobId = request.args.get('jobId')
+    r1cs = request.args.get('r1cs')
+    ciphered_witness = request.args.get('witness')
     ciphered_aeskey = request.args.get('key')
     iv = request.args.get('iv')
+
+    zkey = convert_r1cs_to_zkey(r1cs)   
 
     if mode == 'Secure':
         cmd = json.dumps({
             'command': 'compute-proof',
-            'script': script,
-            'inputs': ciphered_inputs,
+            'jobId': jobId,
+            'zkey': zkey,
+            'witness': ciphered_witness,
             'key': ciphered_aeskey,
             'iv': iv
         }).encode()
 
         client.send_data(cmd)
     else:
-        private_key = os.environ['PRIVATE_KEY']
-        rsa_private_key = RSA.import_key(safe_b64decode(private_key))
-        cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
-        
-        aes_key = cipher_rsa.decrypt(safe_b64decode(ciphered_aeskey))
-        aes_iv = safe_b64decode(iv)
-        
-        cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-        inputs = unpad(cipher_aes.decrypt(safe_b64decode(ciphered_inputs)), AES.block_size)
+        witness = decrypt_witness_mocked(ciphered_witness, ciphered_aeskey, iv)
+
+        p = subprocess.Popen(['/usr/local/bin/node', 'scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
+        proof = p.stdout.read().decode().replace('\n', '')
 
         handle_secure_response({
             'command': 'compute-proof',
-            'proof': 'This proof was generated in mocked worker by script "{}" for the inputs: "{}"'.format(script, inputs.decode()),
+            'jobId': jobId,
+            'proof': proof,
         })
 
     return jsonify({})

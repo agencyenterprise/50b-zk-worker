@@ -4,6 +4,7 @@
 import socket
 import json
 import base64
+import subprocess
 import Crypto.Hash.SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -22,6 +23,16 @@ class VsockServer:
 
     def safe_b64decode(self, data):
         return base64.urlsafe_b64decode(data + '=' * (-len(data) % 4))
+    
+    def decrypt_witness(self, ciphered_witness, ciphered_aeskey, iv):
+        rsa_private_key = RSA.import_key(private_key)
+        cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
+        
+        aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
+        aes_iv = self.safe_b64decode(iv)
+        
+        cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
+        return unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_witness)), AES.block_size)
 
     def recv_data(self):
         """Receive data from a remote endpoint"""
@@ -51,28 +62,23 @@ class VsockServer:
                         from_client.sendall(response)
 
                     if cmd['command'] == 'compute-proof':
-                        script = cmd['script']
-                        ciphered_inputs = cmd['inputs']
+                        jobId = cmd['jobId']
+                        zkey = cmd['zkey']
+                        ciphered_witness = cmd['witness']
                         ciphered_aeskey = cmd['key']
                         iv = cmd['iv']
 
-                        print('Computing proof for: {}'.format(ciphered_inputs), flush=True)
+                        print('Computing proof for: {}'.format(ciphered_witness), flush=True)
 
-                        rsa_private_key = RSA.import_key(private_key)
-                        cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
-                        
-                        aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
-                        aes_iv = self.safe_b64decode(iv)
-                        
-                        cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-                        inputs = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_inputs)), AES.block_size)
+                        witness = self.decrypt_witness(ciphered_witness, ciphered_aeskey, iv)
 
-                        # TODO: Add the actual zk proof computation here
-                        proof = 'This proof was generated inside the enclave by script "{}" for the inputs: "{}"'.format(script, inputs.decode()).encode()
+                        p = subprocess.Popen(['/usr/local/bin/node', 'scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
+                        proof = p.stdout.read().decode().replace('\n', '')
 
                         response = json.dumps({
                             'command': 'compute-proof',
-                            'proof': base64.urlsafe_b64encode(proof).decode(),
+                            'jobId': jobId,
+                            'proof': proof,
                         }).encode()
 
                         from_client.sendall(response)
