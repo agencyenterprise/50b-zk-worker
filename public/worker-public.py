@@ -81,7 +81,7 @@ def handle_secure_response(response):
         set_public_key(response['public_key'])
 
     if response['command'] == 'compute-proof':
-        call_hub('Proof', '/worker/proof', {
+        call_hub('Proof', '/jobs/proof', { # Send proof to the Hub
             'jobId': response['jobId'],
             'proof': response['proof']
         })
@@ -172,10 +172,9 @@ def root():
 def healthcheck():
     return jsonify({ 'status': 'Ok' })
 
-@app.route('/proof', methods=['GET'])
-def proof():
+@app.route('/receiveWitness', methods=['GET']) # Receive witness from the Hub
+def receiveWitness():
     jobId = request.args.get('jobId')
-    r1cs = request.args.get('r1cs')
     ciphered_witness = request.args.get('witness')
     ciphered_aeskey = request.args.get('key')
     iv = request.args.get('iv')
