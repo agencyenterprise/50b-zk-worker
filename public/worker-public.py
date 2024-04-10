@@ -53,15 +53,17 @@ class VsockClient:
 
 mode = os.environ.get('MODE', 'Secure')
 public_key = None
+mocked_private_key = None
 
 def init_worker():
     if mode == 'Secure':
         init_secure_socket()
     else:
-        handle_secure_response({
-            'command': 'get-public-key',
-            'public_key': os.environ['PUBLIC_KEY'],
-        })
+        key = RSA.generate(2048)
+        global public_key
+        global mocked_private_key
+        public_key = base64.urlsafe_b64encode(key.publickey().export_key()).decode()
+        mocked_private_key = key.export_key()
 
 def init_secure_socket():
     global client
@@ -143,8 +145,7 @@ def convert_r1cs_to_zkey(r1cs):
     return zkey
 
 def decrypt_witness_mocked(ciphered_witness, ciphered_aeskey, iv):
-    private_key = os.environ['PRIVATE_KEY']
-    rsa_private_key = RSA.import_key(safe_b64decode(private_key))
+    rsa_private_key = RSA.import_key(safe_b64decode(mocked_private_key))
     cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
     
     aes_key = cipher_rsa.decrypt(safe_b64decode(ciphered_aeskey))
