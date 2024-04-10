@@ -71,8 +71,8 @@ def init_secure_socket():
 
     while True:
         try:
-            print('Connecting to Worker Secure...', flush=True)
-            client.connect((16, 5005))
+            print('Connecting to Worker Secure on CID {}...'.format(os.environ['ENCLAVE_CID']), flush=True)
+            client.connect((int(os.environ['ENCLAVE_CID']), 5005))
             threading.Thread(target=client.recv_data).start()
             break
         except Exception as e:

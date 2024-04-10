@@ -27,10 +27,19 @@ elif [ "$1" = "start" ]; then
     exit 1
   fi
 
-  PORT=5000
+  PUBLIC_PORT=5000
+  ENCLAVE_CID=16
+
+  if [ ! -z "$3" ]; then
+    PUBLIC_PORT=$3
+  fi
+
+  if [ ! -z "$4" ]; then
+    ENCLAVE_CID=$4
+  fi
 
   HOST_IP=$(curl -s http://checkip.amazonaws.com | sed 's/\./-/g')
-  WORKER_URL=http://ec2-$HOST_IP.compute-1.amazonaws.com:$PORT
+  WORKER_URL=http://ec2-$HOST_IP.compute-1.amazonaws.com:$PUBLIC_PORT
   HUB_URL=https://ddfa1056febf4955a6b3950472e6c937.api.mockbin.io
 
   echo "Starting 50b ZK Worker..."
@@ -43,10 +52,10 @@ elif [ "$1" = "start" ]; then
   nitro-cli build-enclave --docker-uri aeandreborges/50b-zk-worker-secure:latest --output-file 50b-zk-worker-secure.eif
 
   echo "Starting 50 ZK Worker Secure enclave..."
-  nitro-cli run-enclave --enclave-name 50b-zk-worker-secure --cpu-count 2 --memory 512 --enclave-cid 16 --eif-path 50b-zk-worker-secure.eif --debug-mode
+  nitro-cli run-enclave --enclave-name 50b-zk-worker-secure-$ENCLAVE_CID --cpu-count 2 --memory 512 --enclave-cid $ENCLAVE_CID --eif-path 50b-zk-worker-secure.eif --debug-mode
   echo "Starting 50 ZK Worker Public container..."
 
-  docker run --name 50b-zk-worker-public -p $PORT:$PORT -d -e WORKER_WALLET=$2 -e WORKER_URL=$WORKER_URL -e HUB_URL=$HUB_URL aeandreborges/50b-zk-worker-public:latest
+  docker run --name 50b-zk-worker-public-$PUBLIC_PORT -p $PUBLIC_PORT:$PUBLIC_PORT -d -e WORKER_WALLET=$2 -e ENCLAVE_CID=$ENCLAVE_CID -e WORKER_URL=$WORKER_URL -e HUB_URL=$HUB_URL aeandreborges/50b-zk-worker-public:latest
   
   echo "Done starting 50b ZK Worker."
 
@@ -55,12 +64,23 @@ elif [ "$1" = "start" ]; then
 elif [ "$1" = "stop" ]; then
   echo "Stopping 50b ZK Worker..."
   
+  PUBLIC_PORT=5000
+  ENCLAVE_CID=16
+
+  if [ ! -z "$2" ]; then
+    PUBLIC_PORT=$2
+  fi
+
+  if [ ! -z "$3" ]; then
+    ENCLAVE_CID=$3
+  fi
+
   echo "Stopping and removing 50b ZK Worker Public container..."
-  docker stop 50b-zk-worker-public
-  docker rm 50b-zk-worker-public
+  docker stop 50b-zk-worker-public-$PUBLIC_PORT
+  docker rm 50b-zk-worker-public-$PUBLIC_PORT
   
   echo "Terminating 50b ZK Worker Secure enclave..."
-  nitro-cli terminate-enclave --enclave-name 50b-zk-worker-secure
+  nitro-cli terminate-enclave --enclave-name 50b-zk-worker-secure-$ENCLAVE_CID
 
   echo "Done stopping 50b ZK Worker."
 
