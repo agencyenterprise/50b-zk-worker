@@ -127,7 +127,7 @@ def call_hub(action, endpoint, data):
         exit(1)
 
 def safe_b64decode(data):
-    return base64.urlsafe_b64decode(data + '=' * (-len(data) % 4))
+    return base64.b64decode(data + '=' * (-len(data) % 4))
 
 def convert_r1cs_to_zkey(r1cs):
     r1cs_file = tempfile.NamedTemporaryFile(delete=False)
@@ -145,7 +145,7 @@ def convert_r1cs_to_zkey(r1cs):
     return zkey
 
 def decrypt_witness_mocked(ciphered_witness, ciphered_aeskey, iv):
-    rsa_private_key = RSA.import_key(safe_b64decode(mocked_private_key))
+    rsa_private_key = RSA.import_key(mocked_private_key)
     cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
     
     aes_key = cipher_rsa.decrypt(safe_b64decode(ciphered_aeskey))
@@ -171,6 +171,15 @@ def root():
 
 @app.route('/healthcheck', methods=['GET'])
 def healthcheck():
+    # Using this just to test chunked data, will remove soon
+    # if mode == 'Secure':
+    #     cmd = json.dumps({
+    #         'command': 'test',
+    #         'data': base64.urlsafe_b64encode(('test' * 2048).encode()).decode()
+    #     }).encode()
+
+    #     client.send_data(cmd)
+
     return jsonify({ 'status': 'Ok' })
 
 @app.route('/witness', methods=['POST']) # Receive witness from the Hub
@@ -190,9 +199,9 @@ def receiveWitness():
             'command': 'compute-proof',
             'jobId': jobId,
             'zkey': zkey,
-            'witness': ciphered_witness,
-            'key': ciphered_aeskey,
-            'iv': iv
+            'witness': base64.urlsafe_b64encode(base64.b64decode(ciphered_witness)).decode(),
+            'key': base64.urlsafe_b64encode(base64.b64decode(ciphered_aeskey)).decode(),
+            'iv': base64.urlsafe_b64encode(base64.b64decode(iv)).decode()
         }).encode()
 
         client.send_data(cmd)

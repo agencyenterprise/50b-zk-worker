@@ -93,7 +93,9 @@ elif [ "$1" = "stop" ]; then
   exit 0
 
 elif [ "$1" = "logs" ]; then
-  nitro-cli console --enclave-name 50b-zk-worker-secure
+  ENCLAVE_CID=16
+
+  nitro-cli console --enclave-name 50b-zk-worker-secure-$ENCLAVE_CID
 
   exit 0
 
