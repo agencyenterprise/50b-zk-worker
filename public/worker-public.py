@@ -173,13 +173,15 @@ def root():
 def healthcheck():
     return jsonify({ 'status': 'Ok' })
 
-@app.route('/receiveWitness', methods=['GET']) # Receive witness from the Hub
+@app.route('/witness', methods=['POST']) # Receive witness from the Hub
 def receiveWitness():
-    jobId = request.args.get('jobId')
-    r1cs = request.args.get('r1cs')
-    ciphered_witness = request.args.get('witness')
-    ciphered_aeskey = request.args.get('key')
-    iv = request.args.get('iv')
+    data = request.json
+
+    jobId = data.get('jobId')
+    ciphered_witness = data.get('witness')
+    ciphered_aeskey = data.get('aesKey')
+    iv = data.get('aesIv')
+    r1cs = data.get('r1cs')
 
     zkey = convert_r1cs_to_zkey(r1cs)   
 
