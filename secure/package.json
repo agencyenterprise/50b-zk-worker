@@ -4,5 +4,8 @@
   "description": "",
   "type": "module",
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "snarkjs": "^0.7.3"
+  }
 }

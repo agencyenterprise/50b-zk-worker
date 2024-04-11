@@ -13,6 +13,7 @@ python -m venv .venv
 source .venv/bin/activate
 cd public
 pip install -r requirements.txt
+npm install
 ```
 
 ### Execute the application:
