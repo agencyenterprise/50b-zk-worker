@@ -59,8 +59,8 @@ elif [ "$1" = "start" ]; then
 
   echo "Starting 50 ZK Worker Secure enclave..."
   nitro-cli run-enclave --enclave-name 50b-zk-worker-secure-$ENCLAVE_CID --cpu-count 2 --memory 2048 --enclave-cid $ENCLAVE_CID --eif-path 50b-zk-worker-secure.eif --debug-mode
+  
   echo "Starting 50 ZK Worker Public container..."
-
   docker run --name 50b-zk-worker-public-$PUBLIC_PORT -p $PUBLIC_PORT:$PUBLIC_PORT -d -e WORKER_WALLET=$2 -e ENCLAVE_CID=$ENCLAVE_CID -e WORKER_URL=$WORKER_URL -e HUB_URL=$HUB_URL aeandreborges/50b-zk-worker-public:latest
   
   echo "Done starting 50b ZK Worker."
