@@ -182,7 +182,7 @@ def healthcheck():
 
     return jsonify({ 'status': 'Ok' })
 
-@app.route('/witness', methods=['POST']) # Receive witness from the Hub
+@app.route('/witness', methods=['POST'])
 def receiveWitness():
     data = request.json
 
@@ -207,14 +207,18 @@ def receiveWitness():
         client.send_data(cmd)
     else:
         witness = decrypt_witness_mocked(ciphered_witness, ciphered_aeskey, iv)
-
         p = subprocess.Popen(['/usr/local/bin/node', 'scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
         proof = p.stdout.read().decode().replace('\n', '')
 
-        handle_secure_response({
-            'command': 'compute-proof',
-            'jobId': jobId,
-            'proof': proof,
-        })
+        def execute_handle_secure_response():
+            time.sleep(15) # Simulate time to process proof
+            handle_secure_response({
+                'command': 'compute-proof',
+                'jobId': jobId,
+                'proof': proof,
+            })
+
+        response_thread = threading.Thread(target=execute_handle_secure_response)
+        response_thread.start()
 
     return jsonify({})
