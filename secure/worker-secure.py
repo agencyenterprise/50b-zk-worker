@@ -34,68 +34,66 @@ class VsockServer:
         cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
         return unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_witness)), AES.block_size)
 
+    def handle_socket_command(self, cmd, from_client):
+        try:
+            if cmd['command'] == 'get-public-key':
+                print('Sending public key to client...', flush=True)
+                print('Public key: {}'.format(base64.urlsafe_b64encode(public_key).decode()), flush=True)
+
+                response = json.dumps({
+                    'command': 'get-public-key',
+                    'public_key': base64.urlsafe_b64encode(public_key).decode()
+                }).encode()
+
+                from_client.sendall(response)
+
+            if cmd['command'] == 'compute-proof':
+                jobId = cmd['jobId']
+                zkey = cmd['zkey']
+                ciphered_witness = cmd['witness']
+                ciphered_aeskey = cmd['key']
+                iv = cmd['iv']
+
+                print('Computing proof for: {}'.format(ciphered_witness), flush=True)
+
+                witness = self.decrypt_witness(ciphered_witness, ciphered_aeskey, iv)
+
+                p = subprocess.Popen(['/usr/local/bin/node', '/app/scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
+                proof = p.stdout.read().decode().replace('\n', '')
+
+                response = json.dumps({
+                    'command': 'compute-proof',
+                    'jobId': jobId,
+                    'proof': proof,
+                }).encode()
+
+                from_client.sendall(response)
+        except Exception as e:
+            print('Error executing command "{}": {}'.format(cmd, e), flush=True)
+
     def recv_data(self):
         """Receive data from a remote endpoint"""
+        print('Waiting for command...', flush=True)
+        (from_client, (remote_cid, remote_port)) = self.sock.accept()
         while True:
-            (from_client, (remote_cid, remote_port)) = self.sock.accept()
-            print('Accept called')
-            data = ''
-
-            # Read 1024 bytes at a time
+            data = bytearray()
             while True:
                 try:
-                    chunk = from_client.recv().decode()
-                    print('Received chunk: {}'.format(chunk), flush=True)
+                    chunk = from_client.recv(1024)
                 except socket.error:
                     break
 
-                data = data + chunk
-                
                 if not chunk:
                     break
 
-            try:
-                print(data, flush=True)
+                data.extend(chunk)
 
-                cmd = json.loads(data)
-
-                if cmd['command'] == 'get-public-key':
-                    print('Sending public key to client...', flush=True)
-                    print('Public key: {}'.format(base64.urlsafe_b64encode(public_key).decode()), flush=True)
-
-                    response = json.dumps({
-                        'command': 'get-public-key',
-                        'public_key': base64.urlsafe_b64encode(public_key).decode()
-                    }).encode()
-
-                    from_client.sendall(response)
-
-                if cmd['command'] == 'compute-proof':
-                    jobId = cmd['jobId']
-                    zkey = cmd['zkey']
-                    ciphered_witness = cmd['witness']
-                    ciphered_aeskey = cmd['key']
-                    iv = cmd['iv']
-
-                    print('Computing proof for: {}'.format(ciphered_witness), flush=True)
-
-                    witness = self.decrypt_witness(ciphered_witness, ciphered_aeskey, iv)
-
-                    p = subprocess.Popen(['/usr/local/bin/node', 'scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
-                    proof = p.stdout.read().decode().replace('\n', '')
-
-                    response = json.dumps({
-                        'command': 'compute-proof',
-                        'jobId': jobId,
-                        'proof': proof,
-                    }).encode()
-
-                    from_client.sendall(response)
-            except Exception as e:
-                print('Error executing command "{}": {}'.format(data, e), flush=True)
-
-            print('Accept finished')
-            from_client.close()
+                try:
+                    cmd = json.loads(data.decode())
+                    self.handle_socket_command(cmd, from_client)
+                    break
+                except ValueError:
+                    continue
 
 def main():
     global private_key

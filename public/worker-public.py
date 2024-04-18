@@ -34,18 +34,24 @@ class VsockClient:
     def recv_data(self):
         """Receive data from a remote endpoint"""
         while True:
+            data = bytearray()
             while True:
                 try:
-                    data = self.sock.recv(1024).decode()
+                    chunk = self.sock.recv(1024)
                 except socket.error:
                     break
-                if not data:
-                    break
-                
-                response = json.loads(data)
-                handle_secure_response(response)
 
-            print()
+                if not chunk:
+                    break
+
+                data.extend(chunk)
+
+                try:
+                    cmd = json.loads(data.decode())
+                    handle_socket_command(cmd)
+                    break
+                except ValueError:
+                    continue
 
     def disconnect(self):
         """Close the client socket"""
@@ -78,15 +84,20 @@ def init_secure_socket():
         except Exception as e:
             time.sleep(10)
 
-def handle_secure_response(response):
-    if response['command'] == 'get-public-key':
-        set_public_key(response['public_key'])
+def handle_socket_command(cmd):
+    try:
+        print('Received command: {}'.format(cmd['command']), flush=True)
 
-    if response['command'] == 'compute-proof':
-        call_hub('Proof', '/jobs/proof', { # Send proof to the Hub
-            'jobId': response['jobId'],
-            'proof': response['proof']
-        })
+        if cmd['command'] == 'get-public-key':
+            set_public_key(cmd['public_key'])
+
+        if cmd['command'] == 'compute-proof':
+            call_hub('Proof', '/jobs/proof', { # Send proof to the Hub
+                'jobId': cmd['jobId'],
+                'proof': cmd['proof']
+            })
+    except Exception as e:
+        print('Error executing command "{}": {}'.format(cmd, e), flush=True)
 
 def set_public_key(key):
     global public_key
@@ -171,15 +182,6 @@ def root():
 
 @app.route('/healthcheck', methods=['GET'])
 def healthcheck():
-    # Using this just to test chunked data, will remove soon
-    # if mode == 'Secure':
-    #     cmd = json.dumps({
-    #         'command': 'test',
-    #         'data': base64.urlsafe_b64encode(('test' * 2048).encode()).decode()
-    #     }).encode()
-
-    #     client.send_data(cmd)
-
     return jsonify({ 'status': 'Ok' })
 
 @app.route('/witness', methods=['POST'])
@@ -212,7 +214,7 @@ def receiveWitness():
 
         def execute_handle_secure_response():
             time.sleep(15) # Simulate time to process proof
-            handle_secure_response({
+            handle_socket_command({
                 'command': 'compute-proof',
                 'jobId': jobId,
                 'proof': proof,
