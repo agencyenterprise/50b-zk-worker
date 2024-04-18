@@ -92,7 +92,7 @@ def handle_socket_command(cmd):
             set_public_key(cmd['public_key'])
 
         if cmd['command'] == 'compute-proof':
-            call_hub('Proof', '/jobs/proof', { # Send proof to the Hub
+            call_hub('Proof', '/jobs/proof', {
                 'jobId': cmd['jobId'],
                 'proof': cmd['proof']
             })
@@ -126,7 +126,7 @@ def register_worker():
 
 def call_hub(action, endpoint, data):
     try:
-        response = httpx.post(os.environ['HUB_URL'] + endpoint, json=data)
+        response = httpx.post(os.environ['HUB_URL'] + endpoint, json=data, timeout=600)
 
         if response.status_code == 200:
             print('{} sent to the Hub successfully.'.format(action), flush=True)

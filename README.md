@@ -1,6 +1,27 @@
 ## To execute the 50b ZK Worker on AWS:
 
-TODO
+Connect to the EC2 instance using SSH
+
+### First time:
+
+Download the 50b ZK Worker Cli and make it executable:
+
+```
+wget https://drive.google.com/uc?export=download&id=1OUvjGyy1Fq22-EW8RfJcAt8503YSd31P
+chmod 755 50b-zk-worker.sh
+```
+
+Execute the command "setup" in sudo mode:
+
+```
+sudo ./50b-zk-worker.sh setup
+```
+
+### Execute the worker:
+
+```
+./50b-zk-worker.sh start <worker_wallet>
+```
 
 ## To execute the 50b ZK Worker on local development environment using "Mocked" mode:
 
@@ -16,7 +37,7 @@ pip install -r requirements.txt
 npm install
 ```
 
-### Execute the application:
+### Execute the worker:
 
 ```
 cd public

@@ -28,18 +28,22 @@ class VsockServer:
         rsa_private_key = RSA.import_key(private_key)
         cipher_rsa = PKCS1_OAEP.new(rsa_private_key, hashAlgo=Crypto.Hash.SHA256)
         
+        print('Decrypting AES key...', flush=True)
         aes_key = cipher_rsa.decrypt(self.safe_b64decode(ciphered_aeskey))
         aes_iv = self.safe_b64decode(iv)
         
+        print('Decrypting witness...', flush=True)
         cipher_aes = AES.new(aes_key, AES.MODE_CBC, aes_iv)
-        return unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_witness)), AES.block_size)
+        witness = unpad(cipher_aes.decrypt(self.safe_b64decode(ciphered_witness)), AES.block_size)
+
+        return witness
 
     def handle_socket_command(self, cmd, from_client):
         try:
             if cmd['command'] == 'get-public-key':
                 print('Sending public key to client...', flush=True)
-                print('Public key: {}'.format(base64.urlsafe_b64encode(public_key).decode()), flush=True)
-
+                print('Public key: {}'.format(base64.b64encode(public_key).decode()), flush=True)
+                
                 response = json.dumps({
                     'command': 'get-public-key',
                     'public_key': base64.urlsafe_b64encode(public_key).decode()
@@ -60,6 +64,8 @@ class VsockServer:
 
                 p = subprocess.Popen(['/usr/local/bin/node', '/app/scripts/proof.js', zkey, witness], stdout=subprocess.PIPE)
                 proof = p.stdout.read().decode().replace('\n', '')
+
+                print('Proof computed: {}'.format(proof), flush=True)
 
                 response = json.dumps({
                     'command': 'compute-proof',
