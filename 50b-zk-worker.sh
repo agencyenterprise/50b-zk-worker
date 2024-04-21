@@ -46,7 +46,7 @@ elif [ "$1" = "start" ]; then
 
   HOST_IP=$(curl -s http://checkip.amazonaws.com | sed 's/\./-/g')
   WORKER_URL=http://ec2-$HOST_IP.compute-1.amazonaws.com:$PUBLIC_PORT
-  HUB_URL=https://ddfa1056febf4955a6b3950472e6c937.api.mockbin.io
+  HUB_URL=https://fiftyb-sparkloom-hackathon-poc-507e211c706e.herokuapp.com
 
   echo "Starting 50b ZK Worker..."
 
